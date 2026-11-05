@@ -1,0 +1,114 @@
+name: Automated Split-Screen Shorts Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      main_url:
+        description: 'Main YouTube URL to clip (Podcast / Stream / Video)'
+        required: true
+        type: string
+      gameplay_url:
+        description: 'Bottom Gameplay YouTube URL (Default: Subway Surfers)'
+        required: false
+        default: 'https://www.youtube.com/watch?v=bdmG3oh-ZD8'
+        type: string
+      count:
+        description: 'Number of Shorts to generate'
+        required: false
+        default: '6'
+        type: string
+      privacy:
+        description: 'YouTube Upload Privacy'
+        required: false
+        default: 'unlisted'
+        type: choice
+        options:
+          - unlisted
+          - public
+          - private
+      upload:
+        description: 'Upload directly to connected YouTube account(s)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install System Dependencies & Fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-deva
+
+      - name: Install Python Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure Credentials & Secrets
+        env:
+          CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
+          CLIENT_SECRET_ACCOUNT1_JSON: ${{ secrets.CLIENT_SECRET_ACCOUNT1_JSON }}
+          CLIENT_SECRET_ACCOUNT2_JSON: ${{ secrets.CLIENT_SECRET_ACCOUNT2_JSON }}
+          TOKEN_ACCOUNT1_JSON: ${{ secrets.TOKEN_ACCOUNT1_JSON }}
+          TOKEN_ACCOUNT2_JSON: ${{ secrets.TOKEN_ACCOUNT2_JSON }}
+        run: |
+          mkdir -p tokens
+          
+          # Write client secrets
+          if [ -n "$CLIENT_SECRET_ACCOUNT1_JSON" ]; then
+            echo "$CLIENT_SECRET_ACCOUNT1_JSON" > client_secret_account1.json
+          fi
+          if [ -n "$CLIENT_SECRET_ACCOUNT2_JSON" ]; then
+            echo "$CLIENT_SECRET_ACCOUNT2_JSON" > client_secret_account2.json
+          fi
+          if [ -n "$CLIENT_SECRET_JSON" ]; then
+            echo "$CLIENT_SECRET_JSON" > client_secret.json
+          fi
+
+          # Write Account 1 token
+          if [ -n "$TOKEN_ACCOUNT1_JSON" ]; then
+            echo "$TOKEN_ACCOUNT1_JSON" > tokens/account1.json
+          fi
+
+          # Write Account 2 token (if configured)
+          if [ -n "$TOKEN_ACCOUNT2_JSON" ]; then
+            echo "$TOKEN_ACCOUNT2_JSON" > tokens/account2.json
+          fi
+
+      - name: Run AI Split-Screen Shorts Pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          UPLOAD_FLAG=""
+          if [ "${{ inputs.upload }}" = "true" ]; then
+            UPLOAD_FLAG="--upload"
+          fi
+
+          python split_screen_pipeline.py \
+            --url "${{ inputs.main_url }}" \
+            --gameplay "${{ inputs.gameplay_url }}" \
+            --count ${{ inputs.count }} \
+            --privacy "${{ inputs.privacy }}" \
+            --key "${{ secrets.GEMINI_API_KEY }}" \
+            $UPLOAD_FLAG
+
+      - name: Upload Rendered Shorts as Workflow Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-shorts
+          path: outputs/*.mp4
+          retention-days: 14

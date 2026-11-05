@@ -1,0 +1,26 @@
+# Python & Environments
+__pycache__/
+*.py[cod]
+.venv/
+env/
+.env
+
+# OAuth secrets & Tokens (Never commit these!)
+client_secret.json
+token.json
+tokens/
+*.json
+!requirements.txt
+
+# Media & Render outputs
+outputs/
+ffmpeg-mcp-server/
+*.mp4
+*.m4a
+*.webm
+*.part
+*.srt
+
+# OS
+.DS_Store
+Thumbs.db
