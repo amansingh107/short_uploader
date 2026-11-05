@@ -4,6 +4,8 @@ __pycache__/
 .venv/
 env/
 .env
+MEMORY.md
+.memory/
 
 # OAuth secrets & Tokens (Never commit these!)
 client_secret.json
