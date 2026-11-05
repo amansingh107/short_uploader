@@ -5,6 +5,9 @@ import re
 import subprocess
 import argparse
 from datetime import timedelta
+import warnings
+warnings.filterwarnings("ignore")
+
 import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
 import google.generativeai as genai
@@ -49,12 +52,16 @@ def download_video(url: str, output_path: str = "source_video.mp4") -> dict:
     """Download video using yt-dlp and return metadata."""
     print(f"\n[1/5] Checking/Downloading source video from: {url}")
     ydl_opts = {
-        "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "format": "bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best[height<=1080]/best/bv*+ba/b",
         "merge_output_format": "mp4",
         "outtmpl": output_path,
         "overwrites": True,
         "quiet": False,
-        "no_warnings": True,
+        "no_warnings": False,
+        "socket_timeout": 30,
+        "retries": 10,
+        "fragment_retries": 10,
+        "remote_components": ["ejs:github"],
     }
     if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 10:
         ydl_opts["cookiefile"] = "cookies.txt"
@@ -65,9 +72,18 @@ def download_video(url: str, output_path: str = "source_video.mp4") -> dict:
             info = ydl.extract_info(url, download=False)
             return info
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        return info
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            return info
+    except Exception as e:
+        print(f"Primary format download failed ({e}). Retrying with flexible fallback clients...")
+        ydl_opts_fallback = dict(ydl_opts)
+        ydl_opts_fallback["format"] = "b/bv*+ba/best"
+        ydl_opts_fallback["extractor_args"] = {"youtube": {"player_client": ["android", "ios", "web"]}}
+        with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+            info = ydl.extract_info(url, download=True)
+            return info
 
 
 def fetch_transcript(video_id: str) -> list[dict]:

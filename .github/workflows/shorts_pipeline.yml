@@ -47,6 +47,11 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
+      - name: Set up Deno (JS Challenge Solver for yt-dlp)
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       - name: Install System Dependencies & Fonts
         run: |
           sudo apt-get update
@@ -55,6 +60,7 @@ jobs:
       - name: Install Python Dependencies
         run: |
           pip install --upgrade pip
+          pip install -U "yt-dlp[default]"
           pip install -r requirements.txt
 
       - name: Configure Credentials & Secrets

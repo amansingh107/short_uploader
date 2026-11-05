@@ -7,6 +7,9 @@ import subprocess
 import argparse
 import re
 from datetime import timedelta
+import warnings
+warnings.filterwarnings("ignore")
+
 import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
 import google.generativeai as genai
@@ -92,22 +95,31 @@ def ensure_video(url_or_path: str, prefix: str = "video", cookiefile: str = "coo
 
     print(f"Downloading from URL: {url_or_path} -> {output_path}...")
     ydl_opts = {
-        "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "format": "bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best[height<=1080]/best/bv*+ba/b",
         "merge_output_format": "mp4",
         "outtmpl": output_path,
         "overwrites": True,
         "quiet": False,
-        "no_warnings": True,
+        "no_warnings": False,
         "socket_timeout": 30,
         "retries": 10,
         "fragment_retries": 10,
+        "remote_components": ["ejs:github"],
     }
     if os.path.exists(cookiefile) and os.path.getsize(cookiefile) > 10:
         print(f"-> Using cookies from '{cookiefile}' for authentication.")
         ydl_opts["cookiefile"] = cookiefile
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url_or_path])
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url_or_path])
+    except Exception as e:
+        print(f"Primary format download failed ({e}). Retrying with flexible fallback clients...")
+        ydl_opts_fallback = dict(ydl_opts)
+        ydl_opts_fallback["format"] = "b/bv*+ba/best"
+        ydl_opts_fallback["extractor_args"] = {"youtube": {"player_client": ["android", "ios", "web"]}}
+        with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+            ydl.download([url_or_path])
 
     return output_path
 
