@@ -92,7 +92,8 @@ def ensure_video(url_or_path: str, prefix: str = "video", cookiefile: str = "coo
 
     print(f"Downloading from URL: {url_or_path} -> {output_path}...")
     ydl_opts = {
-        "format": "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/best[height<=1080]/best",
+        "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "merge_output_format": "mp4",
         "outtmpl": output_path,
         "overwrites": True,
         "quiet": False,

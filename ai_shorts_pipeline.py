@@ -49,12 +49,15 @@ def download_video(url: str, output_path: str = "source_video.mp4") -> dict:
     """Download video using yt-dlp and return metadata."""
     print(f"\n[1/5] Checking/Downloading source video from: {url}")
     ydl_opts = {
-        "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
+        "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "merge_output_format": "mp4",
         "outtmpl": output_path,
         "overwrites": True,
         "quiet": False,
         "no_warnings": True,
     }
+    if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 10:
+        ydl_opts["cookiefile"] = "cookies.txt"
     
     if os.path.exists(output_path) and os.path.getsize(output_path) > 1024 * 1024:
         print(f"-> Source video '{output_path}' already exists locally ({os.path.getsize(output_path)/(1024*1024):.1f} MB). Skipping re-download.")
