@@ -77,7 +77,7 @@ def get_video_duration(video_path: str) -> float:
     return float(res.stdout.strip())
 
 
-def ensure_video(url_or_path: str, prefix: str = "video") -> str:
+def ensure_video(url_or_path: str, prefix: str = "video", cookiefile: str = "cookies.txt") -> str:
     """Download video if URL is provided, or return verified local file path."""
     if os.path.exists(url_or_path):
         print(f"Using local file: {url_or_path}")
@@ -101,6 +101,10 @@ def ensure_video(url_or_path: str, prefix: str = "video") -> str:
         "retries": 10,
         "fragment_retries": 10,
     }
+    if os.path.exists(cookiefile) and os.path.getsize(cookiefile) > 10:
+        print(f"-> Using cookies from '{cookiefile}' for authentication.")
+        ydl_opts["cookiefile"] = cookiefile
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url_or_path])
 
@@ -398,7 +402,11 @@ def generate_batch_shorts(
     video_id = get_video_id(main_input)
     transcript = fetch_transcript(video_id) if video_id else []
 
-    with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
+    ydl_info_opts = {"quiet": True}
+    if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 10:
+        ydl_info_opts["cookiefile"] = "cookies.txt"
+
+    with yt_dlp.YoutubeDL(ydl_info_opts) as ydl:
         try:
             info = ydl.extract_info(main_input, download=False)
             video_title = info.get("title", "Highlight Clip")

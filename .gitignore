@@ -11,6 +11,8 @@ MEMORY.md
 client_secret.json
 token.json
 tokens/
+cookies.txt
+*cookie*
 *.json
 !requirements.txt
 

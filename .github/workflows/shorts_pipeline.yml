@@ -64,6 +64,7 @@ jobs:
           CLIENT_SECRET_ACCOUNT2_JSON: ${{ secrets.CLIENT_SECRET_ACCOUNT2_JSON }}
           TOKEN_ACCOUNT1_JSON: ${{ secrets.TOKEN_ACCOUNT1_JSON }}
           TOKEN_ACCOUNT2_JSON: ${{ secrets.TOKEN_ACCOUNT2_JSON }}
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
         run: |
           mkdir -p tokens
           
@@ -78,14 +79,18 @@ jobs:
             echo "$CLIENT_SECRET_JSON" > client_secret.json
           fi
 
-          # Write Account 1 token
+          # Write Account tokens
           if [ -n "$TOKEN_ACCOUNT1_JSON" ]; then
             echo "$TOKEN_ACCOUNT1_JSON" > tokens/account1.json
           fi
-
-          # Write Account 2 token (if configured)
           if [ -n "$TOKEN_ACCOUNT2_JSON" ]; then
             echo "$TOKEN_ACCOUNT2_JSON" > tokens/account2.json
+          fi
+
+          # Write YouTube Cookies for cloud runner bot-detection bypass
+          if [ -n "$YOUTUBE_COOKIES" ]; then
+            echo "$YOUTUBE_COOKIES" > cookies.txt
+            echo "-> Configured cookies.txt for yt-dlp."
           fi
 
       - name: Run AI Split-Screen Shorts Pipeline
@@ -112,3 +117,8 @@ jobs:
           name: generated-shorts
           path: outputs/*.mp4
           retention-days: 14
+
+      - name: Clean Up Secrets
+        if: always()
+        run: |
+          rm -f cookies.txt client_secret*.json tokens/*.json
