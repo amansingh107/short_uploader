@@ -498,19 +498,29 @@ def generate_batch_shorts(
     # 5. Upload using AI Metadata (Supports Multi-Account)
     if auto_upload:
         if not UPLOAD_AVAILABLE:
-            print("Upload script not found. Skipping upload.")
-            return rendered_files
+            raise RuntimeError("Upload module 'upload_short.py' could not be loaded. Please ensure google-api-python-client is installed.")
 
         tokens_to_use = resolve_token_files(tokens_arg=token_files)
         if not tokens_to_use:
-            print("Warning: No token files found in 'tokens/' or 'token.json'. Skipping upload.")
-            return rendered_files
+            err_msg = (
+                "\n" + "!" * 70 + "\n"
+                "[AUTO-UPLOAD ERROR] '--upload' was specified, but NO valid token files were found!\n"
+                "Searched in 'tokens/' directory and 'token.json'.\n\n"
+                "If running in GitHub Actions, ensure you added your OAuth tokens to Repository Secrets:\n"
+                "  1. Go to GitHub repo -> Settings -> Secrets and variables -> Actions\n"
+                "  2. Add 'TOKEN_ACCOUNT1_JSON' (paste content of tokens/account1.json)\n"
+                "  3. Add 'TOKEN_ACCOUNT2_JSON' (paste content of tokens/account2.json)\n"
+                + "!" * 70 + "\n"
+            )
+            print(err_msg)
+            raise RuntimeError("Auto-upload requested but no account token files found.")
 
-        print(f"\n[UPLOADING] Uploading {len(rendered_files)} Shorts across {len(tokens_to_use)} Account(s)...")
+        print(f"\n[UPLOADING] Publishing {len(rendered_files)} Shorts across {len(tokens_to_use)} Account(s)...")
         for t in tokens_to_use:
             print(f"   -> Target: {t}")
 
         uploaded_shorts = []
+        upload_failures = []
         for c in rendered_files:
             for token_path in tokens_to_use:
                 acc_name = os.path.splitext(os.path.basename(token_path))[0]
@@ -538,17 +548,23 @@ def generate_batch_shorts(
                         "account": acc_name,
                         "video_id": resp.get("id"),
                         "title": c["title"],
+                        "privacy": resp.get("status", {}).get("privacyStatus", privacy_status),
                     })
                 except Exception as e:
-                    print(f"Upload error for Short #{c['clip_number']} on [{acc_name}]: {e}")
+                    err_info = f"Short #{c['clip_number']} on [{acc_name}]: {e}"
+                    print(f"[UPLOAD ERROR] {err_info}")
+                    upload_failures.append(err_info)
 
         print("\n" + "=" * 65)
-        print(f"🚀 UPLOAD COMPLETED: {len(uploaded_shorts)} uploads finished!")
+        print(f"UPLOAD SUMMARY: {len(uploaded_shorts)} succeeded, {len(upload_failures)} failed.")
         for u in uploaded_shorts:
-            print(f"  [{u['account']}] Short #{u['clip']} - https://youtube.com/shorts/{u['video_id']}")
+            print(f"  [{u['account']}] Short #{u['clip']} ({u['privacy']}): https://youtube.com/shorts/{u['video_id']}")
         print("=" * 65)
+
+        if len(uploaded_shorts) == 0 and len(rendered_files) > 0:
+            raise RuntimeError(f"All uploads failed! Errors:\n" + "\n".join(upload_failures))
     else:
-        print("\nTip: Videos are ready locally. Pass '--upload' when ready to publish to YouTube.")
+        print("\nTip: Videos are ready in outputs/. Pass '--upload' when ready to publish to YouTube.")
 
     return rendered_files
 
@@ -565,13 +581,14 @@ if __name__ == "__main__":
     parser.add_argument("--tokens", nargs="+", default=None, help="Specific token JSON files (e.g. tokens/account1.json tokens/account2.json)")
 
     args = parser.parse_args()
+    auto_upload_flag = args.upload or os.environ.get("AUTO_UPLOAD", "").lower() in ("true", "1", "yes")
     generate_batch_shorts(
         main_input=args.url,
         gameplay_input=args.gameplay,
         num_shorts=args.count,
         gemini_key=args.key,
         output_dir=args.output_dir,
-        auto_upload=args.upload,
+        auto_upload=auto_upload_flag,
         privacy_status=args.privacy,
         token_files=args.tokens,
     )

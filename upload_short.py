@@ -37,6 +37,11 @@ def get_authenticated_service(client_secret_file="client_secret.json", token_fil
             print("Refreshing expired credentials...")
             creds.refresh(Request())
         else:
+            if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+                raise RuntimeError(
+                    f"OAuth credentials in '{token_file}' are invalid or missing, and interactive login cannot run in headless CI. "
+                    f"Please re-authenticate locally using 'python auth_account.py --name <account>' and update the GitHub secret."
+                )
             if not os.path.exists(client_secret_file):
                 raise FileNotFoundError(
                     f"'{client_secret_file}' not found. Please provide OAuth client credentials."
@@ -134,11 +139,22 @@ def upload_short(
                 raise RuntimeError("Maximum retries reached. Upload failed.")
 
     video_id = response["id"]
-    print("\n" + "=" * 50)
+    status_info = response.get("status", {})
+    actual_privacy = status_info.get("privacyStatus", privacy_status)
+    upload_status = status_info.get("uploadStatus", "uploaded")
+
+    print("\n" + "=" * 55)
     print("SUCCESS: Video uploaded to YouTube!")
-    print(f"Video ID : {video_id}")
-    print(f"Short URL: https://youtube.com/shorts/{video_id}")
-    print("=" * 50)
+    print(f"Video ID        : {video_id}")
+    print(f"Requested Status: {privacy_status}")
+    print(f"Actual Status   : {actual_privacy} (Upload Status: {upload_status})")
+    print(f"Short URL       : https://youtube.com/shorts/{video_id}")
+    print(f"Studio Edit URL : https://studio.youtube.com/video/{video_id}/edit")
+    if actual_privacy.lower() != privacy_status.lower():
+        print(f"\n[NOTE] YouTube set visibility to '{actual_privacy}'.")
+        print("This happens because the Google Cloud project is in 'Testing' mode.")
+        print("To make it public, visit YouTube Studio and change visibility to Public.")
+    print("=" * 55)
     return response
 
 
