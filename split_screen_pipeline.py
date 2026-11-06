@@ -521,9 +521,13 @@ def generate_batch_shorts(
 
         uploaded_shorts = []
         upload_failures = []
+        exhausted_accounts = set()
         for c in rendered_files:
             for token_path in tokens_to_use:
                 acc_name = os.path.splitext(os.path.basename(token_path))[0]
+                if token_path in exhausted_accounts:
+                    continue
+
                 # Match client secret per account if available
                 secret_candidates = [
                     f"client_secret_{acc_name}.json",
@@ -551,9 +555,15 @@ def generate_batch_shorts(
                         "privacy": resp.get("status", {}).get("privacyStatus", privacy_status),
                     })
                 except Exception as e:
+                    err_str = str(e)
                     err_info = f"Short #{c['clip_number']} on [{acc_name}]: {e}"
                     print(f"[UPLOAD ERROR] {err_info}")
                     upload_failures.append(err_info)
+
+                    if "uploadLimitExceeded" in err_str:
+                        exhausted_accounts.add(token_path)
+                        print(f"\n[NOTICE] Account [{acc_name}] reached YouTube's daily channel upload limit (uploadLimitExceeded).")
+                        print(f"Skipping remaining uploads for [{acc_name}]. It will reset in 24 hours.\n")
 
         print("\n" + "=" * 65)
         print(f"UPLOAD SUMMARY: {len(uploaded_shorts)} succeeded, {len(upload_failures)} failed.")
@@ -562,6 +572,16 @@ def generate_batch_shorts(
         print("=" * 65)
 
         if len(uploaded_shorts) == 0 and len(rendered_files) > 0:
+            if any("uploadLimitExceeded" in f for f in upload_failures):
+                print("\n" + "=" * 70)
+                print("[DAILY UPLOAD LIMIT REACHED ON YOUTUBE]")
+                print("YouTube enforces a 24-hour daily upload limit per channel.")
+                print("Your rendered shorts are SAFE and saved in the workflow artifacts (generated-shorts).")
+                print("\nHow to unlock higher daily limits:")
+                print("1. Go to YouTube Studio (https://studio.youtube.com)")
+                print("2. Settings -> Channel -> Feature eligibility")
+                print("3. Enable 'Intermediate features' (phone verification) and 'Advanced features' (video verification).")
+                print("=" * 70 + "\n")
             raise RuntimeError(f"All uploads failed! Errors:\n" + "\n".join(upload_failures))
     else:
         print("\nTip: Videos are ready in outputs/. Pass '--upload' when ready to publish to YouTube.")
