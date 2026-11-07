@@ -159,15 +159,51 @@ def upload_short(
 
 
 if __name__ == "__main__":
-    test_video = "final_short.mp4"
-    if not os.path.exists(test_video):
-        print(f"Error: Test video file '{test_video}' not found.")
+    import argparse
+    parser = argparse.ArgumentParser(description="Upload a video / Short directly to YouTube")
+    parser.add_argument("--video", "-v", required=True, help="Path to the video MP4 file to upload")
+    parser.add_argument("--title", "-t", default="Uploaded Short #shorts", help="Video Title (ends with #shorts)")
+    parser.add_argument("--description", "-d", default="Check out this short!\n\n#shorts #trending #viral", help="Video Description")
+    parser.add_argument("--privacy", "-p", default="unlisted", choices=["public", "unlisted", "private"], help="Privacy status (default: unlisted)")
+    parser.add_argument("--account", "-a", default="account1", help="Target account: 'account1', 'account2', or path to token JSON")
+    parser.add_argument("--secret", "-s", default=None, help="Path to client secret JSON file (optional)")
+    parser.add_argument("--tags", nargs="*", default=["shorts", "viral", "trending"], help="Tags list")
+
+    args = parser.parse_args()
+
+    # Resolve token path
+    token_candidate = args.account
+    if not os.path.exists(token_candidate):
+        if os.path.exists(os.path.join("tokens", token_candidate)):
+            token_candidate = os.path.join("tokens", token_candidate)
+        elif os.path.exists(os.path.join("tokens", f"{token_candidate}.json")):
+            token_candidate = os.path.join("tokens", f"{token_candidate}.json")
+        elif os.path.exists(f"{token_candidate}.json"):
+            token_candidate = f"{token_candidate}.json"
+
+    if not os.path.exists(token_candidate):
+        print(f"Error: Token file '{token_candidate}' not found.")
         sys.exit(1)
 
+    acc_base = os.path.splitext(os.path.basename(token_candidate))[0]
+
+    # Resolve client secret path
+    secret_path = args.secret
+    if not secret_path:
+        secret_candidates = [
+            f"client_secret_{acc_base}.json",
+            f"client_{acc_base}.json",
+            "client_secret.json",
+        ]
+        secret_path = next((s for s in secret_candidates if os.path.exists(s)), "client_secret.json")
+
+    print(f"Target Account: [{acc_base}] (Token: {token_candidate}, Secret: {secret_path})")
     upload_short(
-        video_file=test_video,
-        title="Automated Short Test #shorts",
-        description="Testing automated video clipping upload pipeline.\n\n#shorts #testing",
-        tags=["shorts", "test", "automation"],
-        privacy_status="unlisted",
+        video_file=args.video,
+        title=args.title,
+        description=args.description,
+        tags=args.tags,
+        privacy_status=args.privacy,
+        token_file=token_candidate,
+        client_secret_file=secret_path,
     )

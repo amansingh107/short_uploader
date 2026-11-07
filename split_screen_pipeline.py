@@ -372,9 +372,18 @@ def render_split_short_with_subtitles(
 def resolve_token_files(tokens_arg: list[str] = None, tokens_dir: str = "tokens") -> list[str]:
     """Find all target account token files (supports multi-account uploading)."""
     if tokens_arg:
-        valid = [t for t in tokens_arg if os.path.exists(t)]
-        if valid:
-            return valid
+        resolved = []
+        for t in tokens_arg:
+            if os.path.exists(t):
+                resolved.append(t)
+            elif os.path.exists(os.path.join(tokens_dir, t)):
+                resolved.append(os.path.join(tokens_dir, t))
+            elif os.path.exists(os.path.join(tokens_dir, f"{t}.json")):
+                resolved.append(os.path.join(tokens_dir, f"{t}.json"))
+            elif os.path.exists(f"{t}.json"):
+                resolved.append(f"{t}.json")
+        if resolved:
+            return sorted(list(set(resolved)))
 
     if os.path.exists(tokens_dir):
         found = [os.path.join(tokens_dir, f) for f in os.listdir(tokens_dir) if f.endswith(".json")]
